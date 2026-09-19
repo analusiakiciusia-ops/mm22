@@ -1,3 +1,9 @@
+--[[
+    Zaawansowany cheat do Roblox (Murder Mystery 2 / podobne)
+    Autor: palofsc
+    Wersja poprawiona: usunieto blad Kick oraz zabezpieczono parentowanie GUI
+]]
+
 -- ===== SERWISY =====
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -5,6 +11,7 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local Lighting = game:GetService("Lighting")
 local CoreGui = game:GetService("CoreGui")
+local StarterGui = game:GetService("StarterGui")
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
@@ -25,12 +32,11 @@ local Config = {
     AutoCollect = true,
     AutoCollectRange = 50,
     AutoTPEnds = true,
-    TeleportToPlayer = false
-,
-    AntiScrollFling = true,
-    AntiFrameVoid = true,
+    TeleportToPlayer = false,
+    AntiFling = true,
+    AntiVoid = true,
     SpeedHack = false,
-.C    SpeedValue = 50,
+    SpeedValue = 50,
     FullBright = true,
     NoClip = false,
 }
@@ -40,14 +46,30 @@ local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MaxCheatGUI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.IgnoreGuiInset = true
 
+-- Bezpieczne parentowanie
+local parented = false
 if gethui then
-    ScreenGui.Parent = gethui()
-elseif syn and syn.protect_gui then
-    syn.protect_gui(ScreenGui)
-    ScreenGui.Parent = CoreGui
-else
-    ScreenGui.Parent = CoreGui
+    local ok, hui = pcall(gethui)
+    if ok and hui then
+        ScreenGui.Parent = hui
+        parented = true
+    end
+end
+if not parented and syn and syn.protect_gui then
+    local ok = pcall(function()
+        syn.protect_gui(ScreenGui)
+        ScreenGui.Parent = CoreGui
+    end)
+    if ok then parented = true end
+end
+if not parented then
+    local ok = pcall(function() ScreenGui.Parent = CoreGui end)
+    if ok then parented = true end
+end
+if not parented then
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 end
 
 local MainFrame = Instance.new("Frame")
@@ -73,7 +95,7 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 Title.BorderSizePixel = 0
-Title.Text = "MAX CHEAT v1.0 | palofsc"
+Title.Text = "MAX CHEAT v1.1 | palofsc"
 Title.TextColor3 = Color3.fromRGB(200, 120, 255)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 18
@@ -87,7 +109,8 @@ local ScrollFrame = Instance.new("ScrollingFrame")
 ScrollFrame.Size = UDim2.new(1, -20, 1, -60)
 ScrollFrame.Position = UDim2.new(0, 10, 0, 50)
 ScrollFrame.BackgroundTransparency = 1
-ScrollFrame.BorderSizePixel = 0anvasSize = UDim2.new(0, 0, 0, 900)
+ScrollFrame.BorderSizePixel = 0
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 900)
 ScrollFrame.ScrollBarThickness = 6
 ScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(120, 0, 200)
 ScrollFrame.Parent = MainFrame
@@ -229,7 +252,7 @@ local function createESP(player)
     gui.Size = UDim2.new(0, 200, 0, 60)
     gui.StudsOffset = Vector3.new(0, 3, 0)
     gui.AlwaysOnTop = true
-    gui.Parent = CoreGui
+    gui.Parent = ScreenGui
 
     local roleLabel = Instance.new("TextLabel")
     roleLabel.Size = UDim2.new(1, 0, 0, 20)
@@ -268,7 +291,7 @@ local function createESP(player)
     highlight.FillTransparency = 0.6
     highlight.OutlineTransparency = 0
     highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    highlight.Parent = CoreGui
+    highlight.Parent = ScreenGui
 
     ESPObjects[player] = {
         gui = gui,
@@ -296,8 +319,11 @@ local function updateESP()
                 obj.roleLabel.Text = Config.ESPRole and role or ""
                 obj.roleLabel.TextColor3 = color
                 obj.nameLabel.Text = Config.ESPName and player.Name or ""
-                local dist = (char.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-                obj.distLabel.Text = Config.ESPDistance and math.floor(dist) .. " studs" or ""
+                local myChar = LocalPlayer.Character
+                if myChar and myChar:FindFirstChild("HumanoidRootPart") then
+                    local dist = (char.HumanoidRootPart.Position - myChar.HumanoidRootPart.Position).Magnitude
+                    obj.distLabel.Text = Config.ESPDistance and math.floor(dist) .. " studs" or ""
+                end
                 obj.highlight.FillColor = color
                 obj.highlight.OutlineColor = color
                 obj.highlight.Enabled = true
@@ -509,13 +535,12 @@ createSlider("Speed Wartosc", 16, 200, Config.SpeedValue, function(v) Config.Spe
 createToggle("NoClip", Config.NoClip, function(v) Config.NoClip = v end)
 
 -- ===== KOMUNIKAT =====
-LocalPlayer:Kick("") -- usun jesli nie chcesz
 task.spawn(function()
-    game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "MAX CHEAT",
-        Text = "Zaladowano pomyslnie. GUI w lewym gornym rogu.",
-        Duration = 5,
-    })
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = "MAX CHEAT",
+            Text = "Zaladowano pomyslnie. GUI w lewym gornym rogu.",
+            Duration = 5,
+        })
+    end)
 end)
-```
-	◦	
