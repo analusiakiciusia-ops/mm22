@@ -1,8 +1,7 @@
 --[[
-    AURORA v3.0 | Profesjonalny cheat MM2 (2026)
+    AURORA v3.1 | Profesjonalny cheat MM2 (2026)
     Autor: palofsc
-    Optymalizacja: cache, throttling, batch processing, brak spamowania RemoteEvent
-    Nowe: animowane GUI, auto-skan mapy, TP do monet, powrót do lobby, auto-exp, antyspam
+    Poprawki: dzialajace zakladki, pelne GUI, optymalizacja, antyspam
 ]]
 
 -- ===== SERWISY =====
@@ -14,67 +13,51 @@ local Lighting = game:GetService("Lighting")
 local CoreGui = game:GetService("CoreGui")
 local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
-local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 
 -- ===== KONFIGURACJA =====
 local Config = {
-    -- ESP
     ESP = true,
     ESPRole = true,
     ESPName = true,
     ESPDistance = true,
-    ESPTracer = false,
-    -- Aimbot
+    ESPBox = false,
     Aimbot = false,
     AimbotKey = Enum.KeyCode.E,
     AimbotFOV = 150,
     AimbotSmooth = 0.25,
     AimbotVisible = true,
-    AimbotTeamCheck = true,
-    -- Hitbox
     HitboxExpander = false,
     HitboxSize = 12,
-    -- Auto
     AutoCollect = true,
     AutoCollectSpeed = 0.15,
     AutoTPEnds = true,
     AutoLobby = true,
-    AutoEXP = true,
-    -- Ochrona
     AntiFling = true,
     AntiVoid = true,
     AntiSpam = true,
-    -- Ruch
     SpeedHack = false,
     SpeedValue = 50,
     NoClip = false,
-    -- Wizualne
     FullBright = true,
-    -- GUI
     GUIAccent = Color3.fromRGB(160, 80, 255),
     GUIAnimations = true,
 }
 
--- ===== CACHE =====
+-- ===== CACHE / ANTYSPAM =====
 local Cache = {
-    characters = {},
     coins = {},
     lastScan = 0,
-    scanInterval = 0.5,
+    scanInterval = 0.4,
     lastCollect = 0,
-    collectInterval = 0.15,
     lastHitbox = 0,
-    hitboxInterval = 0.2,
-    lastSpamCheck = 0,
-    spamInterval = 0.1,
+    lastESP = 0,
     remoteCalls = {},
     maxRemotePerSec = 5,
 }
 
--- ===== ANTYSPAM =====
 local function canCallRemote(name)
     if not Config.AntiSpam then return true end
     local now = tick()
@@ -117,8 +100,8 @@ end
 -- ===== GŁÓWNE OKNO =====
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "Main"
-MainFrame.Size = UDim2.new(0, 0, 0, 0)
-MainFrame.Position = UDim2.new(0.5, -260, 0.5, -230)
+MainFrame.Size = UDim2.new(0, 520, 0, 480)
+MainFrame.Position = UDim2.new(0.5, -260, 0.5, -240)
 MainFrame.BackgroundColor3 = Color3.fromRGB(14, 14, 20)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
@@ -136,15 +119,6 @@ MainStroke.Thickness = 1.5
 MainStroke.Transparency = 0.3
 MainStroke.Parent = MainFrame
 
--- Animacja otwarcia
-if Config.GUIAnimations then
-    TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-        Size = UDim2.new(0, 520, 0, 460)
-    }):Play()
-else
-    MainFrame.Size = UDim2.new(0, 520, 0, 460)
-end
-
 -- ===== TITLE BAR =====
 local TitleBar = Instance.new("Frame")
 TitleBar.Size = UDim2.new(1, 0, 0, 48)
@@ -155,19 +129,6 @@ TitleBar.Parent = MainFrame
 local TitleCorner = Instance.new("UICorner")
 TitleCorner.CornerRadius = UDim.new(0, 14)
 TitleCorner.Parent = TitleBar
-
-local TitleGradient = Instance.new("UIGradient")
-TitleGradient.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Config.GUIAccent),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 40, 160)),
-})
-TitleGradient.Rotation = 90
-TitleGradient.Transparency = NumberSequence.new({
-    NumberSequenceKeypoint.new(0, 1),
-    NumberSequenceKeypoint.new(0.5, 0.85),
-    NumberSequenceKeypoint.new(1, 1),
-})
-TitleGradient.Parent = TitleBar
 
 local Logo = Instance.new("TextLabel")
 Logo.Size = UDim2.new(0, 40, 0, 40)
@@ -180,10 +141,10 @@ Logo.TextSize = 26
 Logo.Parent = TitleBar
 
 local TitleText = Instance.new("TextLabel")
-TitleText.Size = UDim2.new(1, -140, 1, 0)
+TitleText.Size = UDim2.new(1, -160, 1, 0)
 TitleText.Position = UDim2.new(0, 50, 0, 0)
 TitleText.BackgroundTransparency = 1
-TitleText.Text = "AURORA  ·  v3.0"
+TitleText.Text = "AURORA  ·  v3.1"
 TitleText.TextColor3 = Color3.fromRGB(240, 230, 255)
 TitleText.Font = Enum.Font.GothamBold
 TitleText.TextSize = 17
@@ -212,17 +173,12 @@ StatusText.TextSize = 11
 StatusText.TextXAlignment = Enum.TextXAlignment.Left
 StatusText.Parent = TitleBar
 
--- Pulsowanie statusu
 task.spawn(function()
     while ScreenGui.Parent do
         if Config.GUIAnimations then
-            TweenService:Create(StatusDot, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
-                BackgroundTransparency = 0.5
-            }):Play()
+            TweenService:Create(StatusDot, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {BackgroundTransparency = 0.5}):Play()
             task.wait(0.8)
-            TweenService:Create(StatusDot, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
-                BackgroundTransparency = 0
-            }):Play()
+            TweenService:Create(StatusDot, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {BackgroundTransparency = 0}):Play()
             task.wait(0.8)
         else
             task.wait(1)
@@ -245,44 +201,13 @@ local CloseCorner = Instance.new("UICorner")
 CloseCorner.CornerRadius = UDim.new(0, 8)
 CloseCorner.Parent = CloseBtn
 
-local MinimizeBtn = Instance.new("TextButton")
-MinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
-MinimizeBtn.Position = UDim2.new(1, -72, 0, 9)
-MinimizeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-MinimizeBtn.BorderSizePixel = 0
-MinimizeBtn.Text = "—"
-MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-MinimizeBtn.Font = Enum.Font.GothamBold
-MinimizeBtn.TextSize = 14
-MinimizeBtn.Parent = TitleBar
-
-local MinCorner = Instance.new("UICorner")
-MinCorner.CornerRadius = UDim.new(0, 8)
-MinCorner.Parent = MinimizeBtn
-
 CloseBtn.MouseButton1Click:Connect(function()
-    if Config.GUIAnimations then
-        local t = TweenService:Create(MainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
-            Size = UDim2.new(0, 0, 0, 0)
-        })
-        t:Play()
-        t.Completed:Wait()
-    end
     ScreenGui.Enabled = false
-end)
-
-local minimized = false
-MinimizeBtn.MouseButton1Click:Connect(function()
-    minimized = not minimized
-    local targetSize = minimized and UDim2.new(0, 520, 0, 48) or UDim2.new(0, 520, 0, 460)
-    TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-        Size = targetSize
-    }):Play()
 end)
 
 -- ===== ZAKŁADKI =====
 local TabBar = Instance.new("Frame")
-TabBar.Size = UDim2.new(1, -20, 0, 32)
+TabBar.Size = UDim2.new(1, -20, 0, 34)
 TabBar.Position = UDim2.new(0, 10, 0, 56)
 TabBar.BackgroundTransparency = 1
 TabBar.Parent = MainFrame
@@ -299,13 +224,13 @@ local activeTab = nil
 
 local function createTab(name, order)
     local Btn = Instance.new("TextButton")
-    Btn.Size = UDim2.new(0, 120, 1, 0)
+    Btn.Size = UDim2.new(0, 94, 1, 0)
     Btn.BackgroundColor3 = Color3.fromRGB(28, 28, 40)
     Btn.BorderSizePixel = 0
     Btn.Text = name
     Btn.TextColor3 = Color3.fromRGB(180, 180, 200)
     Btn.Font = Enum.Font.GothamSemibold
-    Btn.TextSize = 13
+    Btn.TextSize = 12
     Btn.LayoutOrder = order
     Btn.Parent = TabBar
 
@@ -315,7 +240,7 @@ local function createTab(name, order)
 
     local Page = Instance.new("ScrollingFrame")
     Page.Size = UDim2.new(1, -20, 1, -110)
-    Page.Position = UDim2.new(0, 10, 0, 96)
+    Page.Position = UDim2.new(0, 10, 0, 100)
     Page.BackgroundTransparency = 1
     Page.BorderSizePixel = 0
     Page.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -334,7 +259,6 @@ local function createTab(name, order)
     tabPages[name] = Page
 
     Btn.MouseButton1Click:Connect(function()
-        if activeTab == name then return end
         for n, b in pairs(tabButtons) do
             b.BackgroundColor3 = Color3.fromRGB(28, 28, 40)
             b.TextColor3 = Color3.fromRGB(180, 180, 200)
@@ -344,14 +268,22 @@ local function createTab(name, order)
         Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
         Page.Visible = true
         activeTab = name
-        if Config.GUIAnimations then
-            Page.Position = UDim2.new(0, 10, 0, 110)
-            TweenService:Create(Page, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-                Position = UDim2.new(0, 10, 0, 96)
-            }):Play()
-        end
     end)
+
+    return Page
 end
+
+local PageMain = createTab("Główne", 1)
+local PageCombat = createTab("Walka", 2)
+local PageAuto = createTab("Auto", 3)
+local PageProt = createTab("Ochrona", 4)
+local PageMove = createTab("Ruch", 5)
+
+-- Aktywuj pierwszą zakładkę
+tabButtons["Główne"].BackgroundColor3 = Config.GUIAccent
+tabButtons["Główne"].TextColor3 = Color3.fromRGB(255, 255, 255)
+PageMain.Visible = true
+activeTab = "Główne"
 
 -- ===== FUNKCJE ELEMENTÓW =====
 local function createToggle(parent, name, default, callback)
@@ -402,17 +334,8 @@ local function createToggle(parent, name, default, callback)
     local state = default
     Button.MouseButton1Click:Connect(function()
         state = not state
-        if Config.GUIAnimations then
-            TweenService:Create(Dot, TweenInfo.new(0.2), {
-                BackgroundColor3 = state and Config.GUIAccent or Color3.fromRGB(50, 50, 65)
-            }):Play()
-            TweenService:Create(Knob, TweenInfo.new(0.2, Enum.EasingStyle.Quart), {
-                Position = state and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
-            }):Play()
-        else
-            Dot.BackgroundColor3 = state and Config.GUIAccent or Color3.fromRGB(50, 50, 65)
-            Knob.Position = state and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
-        end
+        TweenService:Create(Dot, TweenInfo.new(0.2), {BackgroundColor3 = state and Config.GUIAccent or Color3.fromRGB(50, 50, 65)}):Play()
+        TweenService:Create(Knob, TweenInfo.new(0.2, Enum.EasingStyle.Quart), {Position = state and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)}):Play()
         callback(state)
     end)
 end
@@ -494,24 +417,13 @@ local function createButton(parent, name, callback)
     C.Parent = Btn
 
     Btn.MouseEnter:Connect(function()
-        if Config.GUIAnimations then
-            TweenService:Create(Btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(40, 40, 55)}):Play()
-        end
+        TweenService:Create(Btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(40, 40, 55)}):Play()
     end)
     Btn.MouseLeave:Connect(function()
-        if Config.GUIAnimations then
-            TweenService:Create(Btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(26, 26, 36)}):Play()
-        end
+        TweenService:Create(Btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(26, 26, 36)}):Play()
     end)
     Btn.MouseButton1Click:Connect(callback)
 end
-
--- ===== ZAKŁADKI =====
-createTab("Główne", 1)
-createTab("Walka", 2)
-createTab("Auto", 3)
-createTab("Ochrona", 4)
-createTab("Ruch", 5)
 
 -- ===== ESP =====
 local ESPObjects = {}
@@ -520,7 +432,6 @@ local function clearESP()
     for _, obj in pairs(ESPObjects) do
         if obj.gui and obj.gui.Parent then obj.gui:Destroy() end
         if obj.highlight and obj.highlight.Parent then obj.highlight:Destroy() end
-        if obj.tracer and obj.tracer.Parent then obj.tracer:Destroy() end
     end
     ESPObjects = {}
 end
@@ -601,7 +512,6 @@ local function createESP(player)
         roleLabel = roleLabel,
         nameLabel = nameLabel,
         distLabel = distLabel,
-        tracer = nil,
     }
 end
 
@@ -668,7 +578,7 @@ local function updateHitbox()
     end
 end
 
--- ===== SKAN MAPY (CACHE) =====
+-- ===== SKAN MAPY =====
 local function scanForCoins()
     local coins = {}
     for _, obj in pairs(Workspace:GetDescendants()) do
@@ -690,9 +600,7 @@ local function autoCollect()
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
     local coins = Cache.coins
-    if #coins == 0 then
-        coins = scanForCoins()
-    end
+    if #coins == 0 then coins = scanForCoins() end
     local collected = 0
     for _, coin in ipairs(coins) do
         if coin and coin.Parent then
@@ -704,18 +612,6 @@ local function autoCollect()
     if collected > 0 and Config.AutoLobby then
         task.wait(0.1)
         hrp.CFrame = CFrame.new(0, 300, 0)
-    end
-end
-
--- ===== AUTO LOBBY / AUTO EXP =====
-local function checkAutoLobby()
-    if not Config.AutoLobby then return end
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    if hrp.Position.Y < 100 then
-        hrp.CFrame = CFrame.new(0, 500, 0)
     end
 end
 
@@ -737,12 +633,6 @@ local function getClosestPlayer()
                                 local ray = Ray.new(Camera.CFrame.Position, (char.HumanoidRootPart.Position - Camera.CFrame.Position).Unit * 500)
                                 local hit = Workspace:FindPartOnRayWithIgnoreList(ray, {LocalPlayer.Character, char})
                                 if hit then continue end
-                            end
-                            if Config.AimbotTeamCheck then
-                                local myRole = getRole(LocalPlayer)
-                                local targetRole = getRole(player)
-                                if myRole == "SZERYF" and targetRole == "SZERYF" then continue end
-                                if myRole == "MORDERCA" and targetRole == "MORDERCA" then continue end
                             end
                             shortest = dist
                             closest = char.HumanoidRootPart
@@ -784,13 +674,138 @@ local function antiFling()
     end
 end
 
--- ===== GŁÓWNA PĘTLA (OPTYMALIZACJA) =====
-local lastESP = 0
-local espInterval = 0.05
-local lastHitbox = 0
-local lastCollect = 0
-local lastScan = 0
-local lastAntiFling = 0
-local lastAntiVoid = 0
-local lastSpeed = 0
-local lastNoClip = 0
+-- ===== GŁÓWNA PĘTLA =====
+RunService.RenderStepped:Connect(function()
+    local now = tick()
+
+    if now - Cache.lastESP > 0.05 then
+        Cache.lastESP = now
+        updateESP()
+    end
+
+    if now - Cache.lastHitbox > 0.2 then
+        Cache.lastHitbox = now
+        updateHitbox()
+    end
+
+    if Config.Aimbot and aimbotActive then
+        local target = getClosestPlayer()
+        if target then
+            local goal = CFrame.new(Camera.CFrame.Position, target.Position)
+            Camera.CFrame = Camera.CFrame:Lerp(goal, Config.AimbotSmooth)
+        end
+    end
+
+    if now - Cache.lastCollect > Config.AutoCollectSpeed then
+        Cache.lastCollect = now
+        if Config.AutoCollect or Config.AutoTPEnds then autoCollect() end
+        if now - Cache.lastScan > Cache.scanInterval then
+            Cache.lastScan = now
+            scanForCoins()
+        end
+    end
+
+    if Config.AntiFling then antiFling() end
+
+    if Config.AntiVoid then
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            if char.HumanoidRootPart.Position.Y < -50 then
+                char.HumanoidRootPart.CFrame = CFrame.new(0, 50, 0)
+            end
+        end
+    end
+
+    if Config.SpeedHack then
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChildOfClass("Humanoid") then
+            char.Humanoid.WalkSpeed = Config.SpeedValue
+        end
+    end
+
+    if Config.NoClip then
+        local char = LocalPlayer.Character
+        if char then
+            for _, part in pairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then part.CanCollide = false end
+            end
+        end
+    end
+end)
+
+-- ===== FULLBRIGHT =====
+if Config.FullBright then
+    Lighting.Brightness = 2
+    Lighting.ClockTime = 14
+    Lighting.FogEnd = 100000
+    Lighting.GlobalShadows = false
+end
+
+-- ===== ZARZĄDZANIE GRACZAMI =====
+Players.PlayerAdded:Connect(function(p)
+    p.CharacterAdded:Connect(function()
+        task.wait(1)
+        if Config.ESP then createESP(p) end
+    end)
+end)
+Players.PlayerRemoving:Connect(function(p)
+    if ESPObjects[p] then
+        if ESPObjects[p].gui then ESPObjects[p].gui:Destroy() end
+        if ESPObjects[p].highlight then ESPObjects[p].highlight:Destroy() end
+        ESPObjects[p] = nil
+    end
+end)
+
+-- ===== ZAWARTOŚĆ ZAKŁADEK =====
+
+-- Główne
+createToggle(PageMain, "ESP", Config.ESP, function(v) Config.ESP = v; if not v then clearESP() end end)
+createToggle(PageMain, "ESP Rola", Config.ESPRole, function(v) Config.ESPRole = v end)
+createToggle(PageMain, "ESP Nazwa", Config.ESPName, function(v) Config.ESPName = v end)
+createToggle(PageMain, "ESP Dystans", Config.ESPDistance, function(v) Config.ESPDistance = v end)
+createToggle(PageMain, "FullBright", Config.FullBright, function(v) Config.FullBright = v end)
+
+-- Walka
+createToggle(PageCombat, "Aimbot (E)", Config.Aimbot, function(v) Config.Aimbot = v end)
+createSlider(PageCombat, "Aimbot FOV", 10, 500, Config.AimbotFOV, function(v) Config.AimbotFOV = v end)
+createSlider(PageCombat, "Aimbot Smooth", 1, 100, 25, function(v) Config.AimbotSmooth = v / 100 end)
+createToggle(PageCombat, "Aimbot Widocznosc", Config.AimbotVisible, function(v) Config.AimbotVisible = v end)
+createToggle(PageCombat, "Hitbox Expander", Config.HitboxExpander, function(v) Config.HitboxExpander = v end)
+createSlider(PageCombat, "Hitbox Rozmiar", 3, 50, Config.HitboxSize, function(v) Config.HitboxSize = v end)
+
+-- Auto
+createToggle(PageAuto, "Auto Zbieranie Monet", Config.AutoCollect, function(v) Config.AutoCollect = v end)
+createSlider(PageAuto, "Szybkosc Zbierania", 1, 50, 15, function(v) Config.AutoCollectSpeed = v / 100 end)
+createToggle(PageAuto, "Auto TP do Monet", Config.AutoTPEnds, function(v) Config.AutoTPEnds = v end)
+createToggle(PageAuto, "Auto Lobby (gora mapy)", Config.AutoLobby, function(v) Config.AutoLobby = v end)
+createButton(PageAuto, "Skanuj Mape Teraz", function()
+    scanForCoins()
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = "AURORA",
+            Text = "Znaleziono " .. #Cache.coins .. " monet.",
+            Duration = 3,
+        })
+    end)
+end)
+
+-- Ochrona
+createToggle(PageProt, "AntiFling", Config.AntiFling, function(v) Config.AntiFling = v end)
+createToggle(PageProt, "AntiVoid", Config.AntiVoid, function(v) Config.AntiVoid = v end)
+createToggle(PageProt, "AntiSpam", Config.AntiSpam, function(v) Config.AntiSpam = v end)
+
+-- Ruch
+createToggle(PageMove, "SpeedHack", Config.SpeedHack, function(v) Config.SpeedHack = v end)
+createSlider(PageMove, "Speed Wartosc", 16, 300, Config.SpeedValue, function(v) Config.SpeedValue = v end)
+createToggle(PageMove, "NoClip", Config.NoClip, function(v) Config.NoClip = v end)
+
+-- ===== POWIADOMIENIE =====
+task.spawn(function()
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = "AURORA v3.1",
+            Text = "Zaladowano. Wszystkie zakladki dzialaja.",
+            Duration = 5,
+        })
+    end)
+end)
