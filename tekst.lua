@@ -1,13 +1,3 @@
-mod made by seraph
-
-```lua
---[[
-    Zaawansowany cheat do Roblox (Murder Mystery 2 / podobne)
-    Autor: palofsc
-    Wymagania: executor poziomu Synapse / Script-Ware / Krnl
-    Wklej całość do executora i wykonaj.
-]]
-
 -- ===== SERWISY =====
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
